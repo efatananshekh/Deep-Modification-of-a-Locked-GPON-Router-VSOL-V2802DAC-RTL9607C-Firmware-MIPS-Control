@@ -115,9 +115,9 @@ Client PC
 
 ### External Access (Port 443 Multiplexing)
 ```
-Internet (rancour.ddns.net:443)
+Internet (yourddnsplaceholder:443)
    │
-   ├──> Router WAN (103.155.218.139:443)
+   ├──> Router WAN (yourpublicip:443)
    │      │
    │      ├──> iptables REDIRECT → 8443
    │      │
@@ -352,13 +352,13 @@ curl -x socks5://admin:stdONU101@192.168.1.1:1080 http://ifconfig.me
 # Should return router's WAN IP
 
 # External test (from phone/mobile data)
-curl -x socks5://admin:stdONU101@rancour.ddns.net:443 http://ifconfig.me
+curl -x socks5://admin:stdONU101@yourddnsplaceholder:443 http://ifconfig.me
 # Should return router's WAN IP
 ```
 
 ### SSH External Access
 ```bash
-ssh -p 443 admin@rancour.ddns.net
+ssh -p 443 admin@yourddnsplaceholder
 # Connects via protomux → Dropbear (2222)
 ```
 
