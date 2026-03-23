@@ -1,0 +1,129 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           BOOT FLOW DIAGRAM                                 │
+│                         VSOL V2802DAC Router                                │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+Power On
+    │
+    ▼
+┌────────────────────────────┐
+│       U-Boot (256KB)       │ ← ROM bootloader
+│  - Load uImage from flash  │
+│  - 3 second timeout        │
+│  - No user interaction     │
+└────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────┐
+│  Linux Kernel 3.18.24      │ ← Decompresses LZMA image
+│  - MIPS 34Kc @ 761MHz      │
+│  - 128MB RAM detected      │
+│  - Mount rootfs (SquashFS) │
+└────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────┐
+│   /sbin/init (PID 1)       │ ← Reads /etc/inittab
+│  - Starts getty on ttyS0   │
+│  - Runs /etc/init.d/rcS    │
+└────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────┐
+│   /etc/init.d/rcS          │ ← System initialization
+│  - Mount /proc, /sys       │
+│  - Load kernel modules:    │
+│    rtk_gpon.ko, switch.ko  │
+│    wifi_rtl8192f.ko        │
+│  - Call /etc/init.d/rc2    │
+│  - Call /etc/init.d/rc3    │
+└────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────┐
+│   /etc/init.d/rc3          │ ← ISP services
+│  - Start pppd (WAN)        │
+│  - Start boa (HTTP:80)     │
+│  - Start cwmpClient (7547) │ ← TR-069 (our enemy)
+│  - Start dnsmasq (ISP cfg) │
+│  - Start udhcpd (DHCP)     │
+└────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────────────┐
+│   /etc/init.d/rc35                                           │ ← OUR HOOK!
+│  - Checks for /var/config/run_customized_sdk.sh             │
+│  - If exists: executes it                                    │
+│  - This is the Realtek SDK's user customization hook         │
+└──────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────────────┐
+│   /var/config/run_customized_sdk.sh (OURS)                   │
+│  #!/bin/sh                                                   │
+│  /var/config/run_test.sh                                     │
+└──────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌──────────────────────────────────────────────────────────────────────────────┐
+│   /var/config/run_test.sh (V13 GPON-Safe)                                    │
+├──────────────────────────────────────────────────────────────────────────────┤
+│  PHASE 1: IMMEDIATE (Safe, no network impact)                               │
+│  ├─ Set HW QoS: echo 0xc0a80124 > /proc/rg/assign_access_ip                 │
+│  └─ Enable priority queues                                                   │
+│                                                                              │
+│  PHASE 2: WAIT FOR GPON (Critical!)                                         │
+│  ├─ Loop every 2s for up to 120s                                            │
+│  ├─ Check: ifconfig nas0_0 | grep "inet addr"                               │
+│  ├─ Check: ifconfig ppp0 | grep "inet addr"                                 │
+│  └─ If timeout: log error, continue anyway (degraded mode)                  │
+│                                                                              │
+│  PHASE 3: START SERVICES                                                     │
+│  ├─ Dropbear SSH on port 2222                                               │
+│  ├─ SOCKS5 proxy on port 1080                                               │
+│  └─ Protomux on port 8443 (routes to SSH/SOCKS5)                            │
+│                                                                              │
+│  PHASE 4: APPLY IPTABLES                                                     │
+│  ├─ DNS hijacking: UDP/TCP 53 → 192.168.1.1                                 │
+│  ├─ Port 443 redirect: ppp0:443 → 8443                                      │
+│  ├─ Block TR-069: port 7547 DROP                                            │
+│  └─ TOS marking: SMART_QOS chain                                            │
+│                                                                              │
+│  PHASE 5: DNS/ADBLOCK                                                        │
+│  ├─ Kill ISP dnsmasq                                                        │
+│  ├─ Start our dnsmasq: Cloudflare upstream + adblock_full.hosts             │
+│  └─ Protect from OOM killer: echo -1000 > /proc/$PID/oom_score_adj          │
+│                                                                              │
+│  PHASE 6: DHCP FIX                                                           │
+│  ├─ Patch /var/udhcpd/udhcpd.conf: "opt dns 192.168.1.1"                    │
+│  ├─ Patch MTU: "opt mtu 1492"                                               │
+│  └─ Restart udhcpd                                                          │
+│                                                                              │
+│  PHASE 7: TUNING                                                             │
+│  ├─ TCP buffers, FIN timeout, TIME_WAIT reuse                               │
+│  ├─ WiFi shortGI, AMPDU, AMSDU                                              │
+│  └─ Start smartqos daemon                                                   │
+│                                                                              │
+│  PHASE 8: WATCHDOG                                                           │
+│  └─ Loop forever: check services, restart if crashed                        │
+└──────────────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌────────────────────────────┐
+│  ROUTER FULLY OPERATIONAL  │
+│  ─────────────────────────  │
+│  Services running:          │
+│  • Dropbear SSH (2222)      │
+│  • SOCKS5 proxy (1080)      │
+│  • Protomux (8443)          │
+│  • dnsmasq (53)             │
+│  • smartqos daemon          │
+│  ─────────────────────────  │
+│  Uptime record: 37+ days    │
+└────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+KEY INSIGHT: /etc/init.d/rc35 is the ONLY safe hook point for persistent mods.
+             /var/config/ is JFFS2 on mtd3 — survives reboots and FW upgrades.
+             GPON registration MUST complete before aggressive iptables rules!
+═══════════════════════════════════════════════════════════════════════════════

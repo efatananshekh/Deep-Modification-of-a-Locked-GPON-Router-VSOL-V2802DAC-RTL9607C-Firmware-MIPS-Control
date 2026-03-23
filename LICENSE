@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Efat Anan Shekh
+Copyright (c) 2026 Frankenrouter Project Contributors
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,3 +19,50 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+---
+
+## DISCLAIMER
+
+This project involves reverse engineering proprietary firmware, modifying embedded systems, and bypassing vendor restrictions. By using this software, you acknowledge:
+
+1. **WARRANTY VOID**: These modifications will void your router's warranty
+2. **BRICKING RISK**: Improper modification can permanently damage the device
+3. **ISP VIOLATIONS**: Modifying GPON serial numbers or bypassing TR-069 may violate ISP terms of service
+4. **LEGAL COMPLIANCE**: Users are responsible for ensuring compliance with local laws and regulations
+5. **EDUCATIONAL PURPOSE**: This project is provided for educational and research purposes only
+6. **NO SUPPORT**: No support is provided for ISP connectivity issues resulting from these modifications
+7. **SECURITY IMPLICATIONS**: Disabling TR-069 and opening external ports increases attack surface
+8. **DATA LOSS**: Flash corruption or boot loops can result in total data loss
+
+**USE AT YOUR OWN RISK. THE AUTHORS ASSUME NO LIABILITY FOR ANY DAMAGE, DATA LOSS, SERVICE INTERRUPTION, OR LEGAL CONSEQUENCES RESULTING FROM USE OF THIS SOFTWARE.**
+
+---
+
+## SAFETY WARNINGS
+
+- **BACKUP FIRST**: Save original firmware and configuration before making changes
+- **TEST INCREMENTALLY**: Apply modifications one at a time, verify stability
+- **UNDERSTAND RISKS**: Read all documentation before modifying production systems
+- **HAVE A RECOVERY PLAN**: Ensure you can recover via TFTP or serial console
+- **DON'T MODIFY GPON SN**: Cloning GPON serial numbers is likely illegal in most jurisdictions
+- **RESPECT NETWORK POLICIES**: Don't use these techniques to bypass legitimate restrictions
+
+---
+
+## ETHICAL USE STATEMENT
+
+This project demonstrates advanced embedded systems security research. It should be used:
+- ✅ To learn about embedded Linux, networking, and reverse engineering
+- ✅ To improve your own equipment's performance and security
+- ✅ To remove unnecessary ISP bloatware from hardware you own
+- ✅ To implement privacy-enhancing technologies (DNS encryption, adblocking)
+
+It should NOT be used to:
+- ❌ Steal internet service by cloning GPON serial numbers
+- ❌ Violate ISP terms of service for commercial purposes
+- ❌ Distribute modified firmware containing ISP credentials
+- ❌ Attack or compromise other users' equipment
+- ❌ Bypass legally-mandated content filtering in your jurisdiction
+
+**By downloading or using this software, you agree to use it responsibly, ethically, and in compliance with all applicable laws.**

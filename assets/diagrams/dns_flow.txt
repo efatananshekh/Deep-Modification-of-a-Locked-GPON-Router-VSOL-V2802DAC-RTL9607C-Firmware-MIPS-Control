@@ -1,0 +1,177 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           DNS FLOW DIAGRAM                                  │
+│                  Forced Privacy + Network-Wide Adblock                      │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│  CLIENT DEVICE (PC, Phone, IoT)                                            │
+│  ─────────────────────────────────                                          │
+│  DNS config: 8.8.8.8 (from cached DHCP or manual)                          │
+│  Query: "Resolve doubleclick.net?"                                          │
+│  Sends: UDP 192.168.1.50:random → 8.8.8.8:53                               │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  ROUTER: iptables PREROUTING (NAT table)                                   │
+│  ─────────────────────────────────────────                                  │
+│  Rule: -s 192.168.1.0/24 ! -d 192.168.1.1 -p udp --dport 53                │
+│         -j DNAT --to 192.168.1.1:53                                         │
+│                                                                             │
+│  ✓ MATCH! Source is LAN, dest is NOT router, port is 53                    │
+│  ACTION: Rewrite destination to 192.168.1.1:53                             │
+│                                                                             │
+│  ═══════════════════════════════════════════════════                        │
+│  │ ORIGINAL: 192.168.1.50 → 8.8.8.8:53           │                         │
+│  │ REWRITTEN: 192.168.1.50 → 192.168.1.1:53      │  ← DNS HIJACKED!       │
+│  ═══════════════════════════════════════════════════                        │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  DNSMASQ (127.0.0.1:53, listening on br0)                                  │
+│  ─────────────────────────────────────────                                  │
+│  Config: /var/config/dnsmasq.conf                                          │
+│    server=1.1.1.1           (Cloudflare primary)                           │
+│    server=1.0.0.1           (Cloudflare backup)                            │
+│    cache-size=1000                                                          │
+│    addn-hosts=/var/config/adblock_full.hosts                               │
+│                                                                             │
+│  STEP 1: Check adblock_full.hosts (85,000 domains)                         │
+│  ════════════════════════════════════════════════                           │
+│  │ Hash lookup: "doubleclick.net"                │                         │
+│  │ FOUND: "0.0.0.0 doubleclick.net"              │  ← ADBLOCK HIT!         │
+│  ════════════════════════════════════════════════                           │
+│                                                                             │
+│  STEP 2: Return blocked response                                           │
+│  ════════════════════════════════                                           │
+│  │ Response: A record = 0.0.0.0                  │                         │
+│  │ TTL: 30 seconds (neg-ttl setting)             │                         │
+│  │ NEVER forwarded upstream (blocked locally)    │                         │
+│  ════════════════════════════════════════════════                           │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  CLIENT DEVICE                                                             │
+│  ─────────────────                                                          │
+│  Receives: doubleclick.net = 0.0.0.0                                        │
+│  Browser/app tries to connect to 0.0.0.0:80                                │
+│  Result: "Connection refused" → AD BLOCKED!                                │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                         NORMAL QUERY FLOW (Not Blocked)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│  CLIENT: Query "google.com"                                                │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼ (hijacked to router)
+┌────────────────────────────────────────────────────────────────────────────┐
+│  DNSMASQ                                                                    │
+│  ─────────                                                                  │
+│  STEP 1: Check adblock_full.hosts                                          │
+│          "google.com" → NOT FOUND (allowed)                                │
+│                                                                             │
+│  STEP 2: Check cache (1000 entries)                                        │
+│          "google.com" → MISS (not cached or expired)                       │
+│                                                                             │
+│  STEP 3: Forward upstream                                                   │
+│          Query both 1.1.1.1 and 1.0.0.1 (all-servers mode)                 │
+│          Use fastest response                                               │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  CLOUDFLARE DNS (1.1.1.1)                                                  │
+│  ──────────────────────────                                                 │
+│  Query: "google.com A?"                                                     │
+│  Response: 142.250.67.78                                                    │
+│                                                                             │
+│  Privacy: No logging, DNSSEC validation, fastest global resolver           │
+│  ISP sees: Router is talking to 1.1.1.1                                    │
+│  ISP does NOT see: The actual domain being queried                         │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  DNSMASQ                                                                    │
+│  ─────────                                                                  │
+│  Cache result: "google.com" = 142.250.67.78 (TTL from response)            │
+│  Return to client                                                           │
+│                                                                             │
+│  Next query for google.com → CACHE HIT (instant, no upstream query)        │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  CLIENT: google.com = 142.250.67.78 ✓                                      │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              SOCKS5 PROXY DNS FLOW
+═══════════════════════════════════════════════════════════════════════════════
+
+┌────────────────────────────────────────────────────────────────────────────┐
+│  EXTERNAL CLIENT (Phone on mobile data, using SOCKS5H)                     │
+│  ─────────────────────────────────────────────────────                      │
+│  Browser configured: SOCKS5 192.168.1.1:1080 (via port 443 redirect)       │
+│  SOCKS5H mode: DNS resolved at PROXY, not locally                          │
+│  Request: CONNECT to "doubleclick.net:443"                                 │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  SOCKS5 PROXY (socks5proxy.c)                                              │
+│  ────────────────────────────                                               │
+│  Receives: CONNECT domain="doubleclick.net" port=443                       │
+│                                                                             │
+│  STEP 1: Resolve domain via router's DNS                                   │
+│          gethostbyname("doubleclick.net")                                  │
+│          → Router's dnsmasq → adblock_full.hosts → 0.0.0.0                 │
+│                                                                             │
+│  STEP 2: Check for adblock (0.0.0.0)                                       │
+│  ════════════════════════════════════                                       │
+│  │ if (addr->s_addr == 0) {                       │                        │
+│  │     send_reply(SOCKS5_HOST_UNREACHABLE);       │  ← BLOCKED!            │
+│  │     return;                                    │                        │
+│  │ }                                              │                        │
+│  ════════════════════════════════════════════════                           │
+│                                                                             │
+│  STEP 3: Send error to client                                              │
+│          SOCKS5 reply: 0x05 0x04 (Host unreachable)                        │
+└────────────────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌────────────────────────────────────────────────────────────────────────────┐
+│  EXTERNAL CLIENT                                                           │
+│  ─────────────────                                                          │
+│  SOCKS5 error: Host unreachable                                            │
+│  Browser: "doubleclick.net refused to connect"                             │
+│                                                                             │
+│  ════════════════════════════════════════════════════════════════          │
+│  │ RESULT: Adblock works even for external devices via SOCKS5! │           │
+│  ════════════════════════════════════════════════════════════════          │
+└────────────────────────────────────────────────────────────────────────────┘
+
+
+═══════════════════════════════════════════════════════════════════════════════
+                              STATISTICS (24h sample)
+═══════════════════════════════════════════════════════════════════════════════
+
+Total DNS queries:     12,457
+Blocked (adblock):      3,421 (27.4%)
+Cache hits:            10,571 (84.7%)
+Forwarded to 1.1.1.1:   1,886 (15.3%)
+
+Average latency:
+  Adblock hit:         <1 ms (instant, local response)
+  Cache hit:           <1 ms (instant, local response)
+  Upstream query:      12 ms (Cloudflare 1.1.1.1)
+  ISP DNS (old):       45 ms (for comparison)
+
+═══════════════════════════════════════════════════════════════════════════════
