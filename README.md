@@ -1,3 +1,5 @@
+Developed under live network conditions with no hardware recovery path (no JTAG/UART).
+
 # Frankenrouter: Deep Modification of a Locked GPON ONU
 
 **What happens when you reverse-engineer a $20 ISP-locked router with ~10MB of flash and turn it into a privacy-focused, QoS-enabled gateway? This.**
